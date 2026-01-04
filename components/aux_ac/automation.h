@@ -16,7 +16,7 @@ namespace esphome
         public:
             explicit AirConDisplayOffAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->displayOffSequence();
             }
@@ -31,7 +31,7 @@ namespace esphome
         public:
             explicit AirConDisplayOnAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->displayOnSequence();
             }
@@ -47,7 +47,7 @@ namespace esphome
         public:
             explicit AirConVLouverSwingAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->setVLouverSwingSequence();
             }
@@ -62,7 +62,7 @@ namespace esphome
         public:
             explicit AirConVLouverStopAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->setVLouverStopSequence();
             }
@@ -77,7 +77,7 @@ namespace esphome
         public:
             explicit AirConVLouverTopAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->setVLouverTopSequence();
             }
@@ -92,7 +92,7 @@ namespace esphome
         public:
             explicit AirConVLouverMiddleAboveAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->setVLouverMiddleAboveSequence();
             }
@@ -107,7 +107,7 @@ namespace esphome
         public:
             explicit AirConVLouverMiddleAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->setVLouverMiddleSequence();
             }
@@ -122,7 +122,7 @@ namespace esphome
         public:
             explicit AirConVLouverMiddleBelowAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->setVLouverMiddleBelowSequence();
             }
@@ -137,7 +137,7 @@ namespace esphome
         public:
             explicit AirConVLouverBottomAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->setVLouverBottomSequence();
             }
@@ -154,7 +154,7 @@ namespace esphome
 
             AirConVLouverSetAction(AirCon *ac) : ac_(ac) {};
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 vlpos_ = this->value_.value(x...);
                 this->ac_->setVLouverFrontendSequence((ac_vlouver_frontend)vlpos_);
@@ -182,7 +182,7 @@ namespace esphome
                 this->static_ = true;
             }
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 if (this->static_)
                 {
@@ -209,7 +209,7 @@ namespace esphome
         public:
             explicit AirConPowerLimitationOffAction(AirCon *ac) : ac_(ac) {}
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->ac_->powerLimitationOffSequence();
             }
@@ -226,7 +226,7 @@ namespace esphome
 
             AirConPowerLimitationOnAction(AirCon *ac) : ac_(ac) {};
 
-            void play(const Ts &...x) override
+            void play(Ts... x) override
             {
                 this->pwr_lim_ = this->value_.value(x...);
                 this->ac_->powerLimitationOnSequence(this->pwr_lim_);
