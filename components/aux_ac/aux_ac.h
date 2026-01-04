@@ -2957,498 +2957,474 @@ namespace esphome
                 this->dump_traits_(TAG);
             }
 
-            // вызывается пользователем из интерфейса ESPHome или Home Assistant
             void control(const esphome::climate::ClimateCall &call) override
-            {
-                bool hasCommand = false;
-                ac_command_t cmd;
-
-                _clearCommand(&cmd); // не забываем очищать, а то будет мусор
-
-                // User requested mode change
-                if (call.get_mode().has_value())
-                {
-                    ClimateMode mode = *call.get_mode();
-
-                    switch (mode)
-                    {
-                    case climate::CLIMATE_MODE_OFF:
-                        hasCommand = true;
-                        cmd.power = AC_POWER_OFF;
-
-#if defined(PRESETS_SAVING)
-                        load_preset(&cmd, POS_MODE_OFF);
-#endif
-
-                        this->mode = mode;
-                        break;
-
-                    case climate::CLIMATE_MODE_COOL:
-                        hasCommand = true;
-                        cmd.power = AC_POWER_ON;
-                        cmd.mode = AC_MODE_COOL;
-
-#if defined(PRESETS_SAVING)
-                        load_preset(&cmd, POS_MODE_COOL);
-#endif
-
-                        this->mode = mode;
-                        break;
-
-                    case climate::CLIMATE_MODE_HEAT:
-                        hasCommand = true;
-                        cmd.power = AC_POWER_ON;
-                        cmd.mode = AC_MODE_HEAT;
-
-#if defined(PRESETS_SAVING)
-                        load_preset(&cmd, POS_MODE_HEAT);
-#endif
-
-                        this->mode = mode;
-                        break;
-
-                    case climate::CLIMATE_MODE_HEAT_COOL:
-                        hasCommand = true;
-                        cmd.power = AC_POWER_ON;
-                        cmd.mode = AC_MODE_AUTO;
-
-#if defined(PRESETS_SAVING)
-                        load_preset(&cmd, POS_MODE_AUTO);
-#endif
-
-                        this->mode = mode;
-                        break;
-
-                    case climate::CLIMATE_MODE_FAN_ONLY:
-                        hasCommand = true;
-                        cmd.power = AC_POWER_ON;
-                        cmd.mode = AC_MODE_FAN;
-
-#if defined(PRESETS_SAVING)
-                        load_preset(&cmd, POS_MODE_FAN);
-#endif
-
-                        cmd.sleep = AC_SLEEP_OFF;
-                        this->mode = mode;
-                        break;
-
-                    case climate::CLIMATE_MODE_DRY:
-                        hasCommand = true;
-                        cmd.power = AC_POWER_ON;
-                        cmd.mode = AC_MODE_DRY;
-
-#if defined(PRESETS_SAVING)
-                        load_preset(&cmd, POS_MODE_DRY);
-#endif
-
-                        cmd.fanTurbo = AC_FANTURBO_OFF; // зависимость от режима DRY
-                        cmd.sleep = AC_SLEEP_OFF;       // зависимость от режима DRY
-                        this->mode = mode;
-                        break;
-
-                    // другие возможные значения (чтоб не забыть)
-                    // case climate::CLIMATE_MODE_AUTO:        // этот режим в будущем можно будет использовать для автоматического пресета (ПИД-регулятора, например)
-                    default:
-                        break;
-                    }
-                }
-
-                // User requested fan_mode change
-                if (call.get_fan_mode().has_value())
-                {
-                    ClimateFanMode fanmode = *call.get_fan_mode();
-
-                    switch (fanmode)
-                    {
-                    case climate::CLIMATE_FAN_AUTO:
-                        hasCommand = true;
-                        cmd.fanSpeed = AC_FANSPEED_AUTO;
-                        cmd.fanTurbo = AC_FANTURBO_OFF;
-                        cmd.fanMute = AC_FANMUTE_OFF;
-                        this->fan_mode = fanmode;
-                        break;
-
-                    case climate::CLIMATE_FAN_LOW:
-                        hasCommand = true;
-                        cmd.fanSpeed = AC_FANSPEED_LOW;
-                        cmd.fanTurbo = AC_FANTURBO_OFF;
-                        cmd.fanMute = AC_FANMUTE_OFF;
-                        this->fan_mode = fanmode;
-                        break;
-
-                    case climate::CLIMATE_FAN_MEDIUM:
-                        hasCommand = true;
-                        cmd.fanSpeed = AC_FANSPEED_MEDIUM;
-                        cmd.fanTurbo = AC_FANTURBO_OFF;
-                        cmd.fanMute = AC_FANMUTE_OFF;
-                        this->fan_mode = fanmode;
-                        break;
-
-                    case climate::CLIMATE_FAN_HIGH:
-                        hasCommand = true;
-                        cmd.fanSpeed = AC_FANSPEED_HIGH;
-                        cmd.fanTurbo = AC_FANTURBO_OFF;
-                        cmd.fanMute = AC_FANMUTE_OFF;
-                        this->fan_mode = fanmode;
-                        break;
-
-                    // другие возможные значения (чтобы не забыть)
-                    // case climate::CLIMATE_FAN_ON:
-                    // case climate::CLIMATE_FAN_OFF:
-                    // case climate::CLIMATE_FAN_MIDDLE:
-                    // case climate::CLIMATE_FAN_FOCUS:
-                    // case climate::CLIMATE_FAN_DIFFUSE:
-                    default:
-                        break;
-                    }
-                }
-#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 11, 0)
-                else if (call.has_custom_fan_mode())
-                {
-                    const char *customfanmode = call.get_custom_fan_mode();
-
-                    if (strcmp(customfanmode, Constants::TURBO.c_str()) == 0)
-                    {
-                        // TURBO fan mode is suitable in COOL and HEAT modes.
-                        // Other modes don't accept TURBO fan mode.
-                        hasCommand = true;
-                        cmd.fanTurbo = AC_FANTURBO_ON;
-                        cmd.fanMute = AC_FANMUTE_OFF;
-                        this->set_custom_fan_mode_(customfanmode);
-                    }
-                    else if (strcmp(customfanmode, Constants::MUTE.c_str()) == 0)
-                    {
-                        // MUTE fan mode is suitable in FAN mode only for Rovex air conditioner.
-                        // In COOL mode AC receives command without any changes.
-                        // May be other AUX-based air conditioners do the same.
-                        hasCommand = true;
-                        cmd.fanMute = AC_FANMUTE_ON;
-                        cmd.fanTurbo = AC_FANTURBO_OFF;
-                        this->set_custom_fan_mode_(customfanmode);
-                    }
-                }
-#else
-                else if (call.get_custom_fan_mode().has_value())
-                {
-                    std::string customfanmode = *call.get_custom_fan_mode();
-
-                    if (customfanmode == Constants::TURBO)
-                    {
-                        // TURBO fan mode is suitable in COOL and HEAT modes.
-                        // Other modes don't accept TURBO fan mode.
-                        /*
-                        if (       cmd.mode == AC_MODE_COOL
-                                or cmd.mode == AC_MODE_HEAT
-                                or _current_ac_state.mode == AC_MODE_COOL
-                                or _current_ac_state.mode == AC_MODE_HEAT) {
-                        */
-                        hasCommand = true;
-                        cmd.fanTurbo = AC_FANTURBO_ON;
-                        cmd.fanMute = AC_FANMUTE_OFF; // зависимость от fanturbo
-                        this->custom_fan_mode = customfanmode;
-                        /*
-                        } else {
-                            _debugMsg(F("TURBO fan mode is suitable in COOL and HEAT modes only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
-                        }
-                        */
-                    }
-                    else if (customfanmode == Constants::MUTE)
-                    {
-                        // MUTE fan mode is suitable in FAN mode only for Rovex air conditioner.
-                        // In COOL mode AC receives command without any changes.
-                        // May be other AUX-based air conditioners do the same.
-                        // if (                     cmd.mode == AC_MODE_FAN
-                        //        or _current_ac_state.mode == AC_MODE_FAN) {
-
-                        hasCommand = true;
-                        cmd.fanMute = AC_FANMUTE_ON;
-                        cmd.fanTurbo = AC_FANTURBO_OFF; // зависимость от fanmute
-                        this->custom_fan_mode = customfanmode;
-                        //} else {
-                        //    _debugMsg(F("MUTE fan mode is suitable in FAN mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
-                        //}
-                    }
-                }
-#endif
-
-                // Пользователь выбрал пресет
-                if (call.get_preset().has_value())
-                {
-                    ClimatePreset preset = *call.get_preset();
-
-                    switch (preset)
-                    {
-                    case climate::CLIMATE_PRESET_SLEEP:
-                        // Ночной режим (SLEEP).
-                        // По инструкциям комбинируется только с режимами COOL и HEAT. Автоматически выключается через 7 часов.
-                        // Brokly: вроде как работает еще и с AUTO и DRY
-                        // COOL: температура +1 градус через час, еще через час дополнительные +1 градус, дальше не меняется.
-                        // HEAT: температура -2 градуса через час, еще через час дополнительные -2 градуса, дальше не меняется.
-                        // Восстанавливается ли температура через 7 часов при отключении режима - не понятно.
-                        if (cmd.mode == AC_MODE_COOL or _current_ac_state.mode == AC_MODE_COOL or
-                            cmd.mode == AC_MODE_HEAT or _current_ac_state.mode == AC_MODE_HEAT or
-                            cmd.mode == AC_MODE_DRY or _current_ac_state.mode == AC_MODE_DRY or
-                            cmd.mode == AC_MODE_AUTO or _current_ac_state.mode == AC_MODE_AUTO)
                         {
+                        bool hasCommand = false;
+                        ac_command_t cmd;
+                        _clearCommand(&cmd);
+
+                        // -------------------------
+                        // MODE
+                        // -------------------------
+                        if (call.get_mode().has_value())
+                        {
+                            ClimateMode req_mode = *call.get_mode();
+
+                            // Strong OFF guard: skip if we're already OFF (either frontend or AC state says power off)
+                            if (req_mode == climate::CLIMATE_MODE_OFF &&
+                                (this->mode == climate::CLIMATE_MODE_OFF || _current_ac_state.power == AC_POWER_OFF))
+                            {
+                            _debugMsg(F("Mode OFF unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            // For other modes, skip if unchanged
+                            else if (req_mode == this->mode)
+                            {
+                            _debugMsg(F("Mode unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else
+                            {
+                            switch (req_mode)
+                            {
+                            case climate::CLIMATE_MODE_OFF:
+                                hasCommand = true;
+                                cmd.power = AC_POWER_OFF;
+                        #if defined(PRESETS_SAVING)
+                                load_preset(&cmd, POS_MODE_OFF);
+                        #endif
+                                this->mode = req_mode;
+                                break;
+
+                            case climate::CLIMATE_MODE_COOL:
+                                hasCommand = true;
+                                cmd.power = AC_POWER_ON;
+                                cmd.mode = AC_MODE_COOL;
+                        #if defined(PRESETS_SAVING)
+                                load_preset(&cmd, POS_MODE_COOL);
+                        #endif
+                                this->mode = req_mode;
+                                break;
+
+                            case climate::CLIMATE_MODE_HEAT:
+                                hasCommand = true;
+                                cmd.power = AC_POWER_ON;
+                                cmd.mode = AC_MODE_HEAT;
+                        #if defined(PRESETS_SAVING)
+                                load_preset(&cmd, POS_MODE_HEAT);
+                        #endif
+                                this->mode = req_mode;
+                                break;
+
+                            case climate::CLIMATE_MODE_HEAT_COOL:
+                                hasCommand = true;
+                                cmd.power = AC_POWER_ON;
+                                cmd.mode = AC_MODE_AUTO;
+                        #if defined(PRESETS_SAVING)
+                                load_preset(&cmd, POS_MODE_AUTO);
+                        #endif
+                                this->mode = req_mode;
+                                break;
+
+                            case climate::CLIMATE_MODE_FAN_ONLY:
+                                hasCommand = true;
+                                cmd.power = AC_POWER_ON;
+                                cmd.mode = AC_MODE_FAN;
+                        #if defined(PRESETS_SAVING)
+                                load_preset(&cmd, POS_MODE_FAN);
+                        #endif
+                                cmd.sleep = AC_SLEEP_OFF;
+                                this->mode = req_mode;
+                                break;
+
+                            case climate::CLIMATE_MODE_DRY:
+                                hasCommand = true;
+                                cmd.power = AC_POWER_ON;
+                                cmd.mode = AC_MODE_DRY;
+                        #if defined(PRESETS_SAVING)
+                                load_preset(&cmd, POS_MODE_DRY);
+                        #endif
+                                cmd.fanTurbo = AC_FANTURBO_OFF;
+                                cmd.sleep = AC_SLEEP_OFF;
+                                this->mode = req_mode;
+                                break;
+
+                            default:
+                                break;
+                            }
+                            }
+                        }
+
+                        // -------------------------
+                        // FAN MODE (standard)
+                        // -------------------------
+                        if (call.get_fan_mode().has_value())
+                        {
+                            ClimateFanMode req_fan = *call.get_fan_mode();
+
+                            if (req_fan == this->fan_mode)
+                            {
+                            _debugMsg(F("Fan mode unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else
+                            {
+                            switch (req_fan)
+                            {
+                            case climate::CLIMATE_FAN_AUTO:
+                                hasCommand = true;
+                                cmd.fanSpeed = AC_FANSPEED_AUTO;
+                                cmd.fanTurbo = AC_FANTURBO_OFF;
+                                cmd.fanMute = AC_FANMUTE_OFF;
+                                this->fan_mode = req_fan;
+                                break;
+
+                            case climate::CLIMATE_FAN_LOW:
+                                hasCommand = true;
+                                cmd.fanSpeed = AC_FANSPEED_LOW;
+                                cmd.fanTurbo = AC_FANTURBO_OFF;
+                                cmd.fanMute = AC_FANMUTE_OFF;
+                                this->fan_mode = req_fan;
+                                break;
+
+                            case climate::CLIMATE_FAN_MEDIUM:
+                                hasCommand = true;
+                                cmd.fanSpeed = AC_FANSPEED_MEDIUM;
+                                cmd.fanTurbo = AC_FANTURBO_OFF;
+                                cmd.fanMute = AC_FANMUTE_OFF;
+                                this->fan_mode = req_fan;
+                                break;
+
+                            case climate::CLIMATE_FAN_HIGH:
+                                hasCommand = true;
+                                cmd.fanSpeed = AC_FANSPEED_HIGH;
+                                cmd.fanTurbo = AC_FANTURBO_OFF;
+                                cmd.fanMute = AC_FANMUTE_OFF;
+                                this->fan_mode = req_fan;
+                                break;
+
+                            default:
+                                break;
+                            }
+                            }
+                        }
+                        // -------------------------
+                        // FAN MODE (custom)
+                        // -------------------------
+                        #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 11, 0)
+                        else if (call.has_custom_fan_mode())
+                        {
+                            const char *req_custom = call.get_custom_fan_mode();
+
+                            // Skip if unchanged using Climate API
+                            if (this->has_custom_fan_mode() && strcmp(this->get_custom_fan_mode(), req_custom) == 0)
+                            {
+                            _debugMsg(F("Custom fan mode unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else if (strcmp(req_custom, Constants::TURBO.c_str()) == 0)
+                            {
                             hasCommand = true;
-                            cmd.sleep = AC_SLEEP_ON;
-                            cmd.health = AC_HEALTH_OFF; // для логики пресетов
-                            cmd.health_status = AC_HEALTH_STATUS_OFF;
-                            this->preset = preset;
-                        }
-                        else
-                        {
-                            _debugMsg(F("SLEEP preset is suitable in COOL and HEAT modes only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
-                        }
-                        break;
-
-                    case climate::CLIMATE_PRESET_NONE:
-                        // выбран пустой пресет, сбрасываем все настройки
-                        hasCommand = true;
-                        cmd.health = AC_HEALTH_OFF;
-                        // cmd.health_status = AC_HEALTH_STATUS_OFF;   // GK: не нужно ставить, т.к. этот флаг устанавливается самим сплитом
-                        cmd.sleep = AC_SLEEP_OFF;
-                        cmd.mildew = AC_MILDEW_OFF;
-                        cmd.clean = AC_CLEAN_OFF;
-                        this->preset = preset;
-
-                        _debugMsg(F("Clear all builtin presets."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
-                        break;
-                    default:
-                        // никакие другие встроенные пресеты не поддерживаются
-                        _debugMsg(F("Preset %02X is unsupported."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__, preset);
-                        break;
-                    }
-                }
-#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 11, 0)
-                else if (call.has_custom_preset())
-                {
-                    const char *custom_preset = call.get_custom_preset();
-
-                    if (strcmp(custom_preset, Constants::CLEAN.c_str()) == 0)
-                    {
-                        // режим очистки кондиционера, включается (или должен включаться) при AC_POWER_OFF
-                        // TODO: надо отдебажить выключение этого режима
-                        if (cmd.power == AC_POWER_OFF or _current_ac_state.power == AC_POWER_OFF)
-                        {
-                            hasCommand = true;
-                            cmd.clean = AC_CLEAN_ON;
-                            cmd.mildew = AC_MILDEW_OFF;
-                            this->set_custom_preset_(custom_preset);
-                        }
-                        else
-                        {
-                            _debugMsg(F("CLEAN preset is suitable in POWER_OFF mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
-                        }
-                    }
-                    else if (strcmp(custom_preset, Constants::HEALTH.c_str()) == 0)
-                    {
-                        if (cmd.power == AC_POWER_ON ||
-                            _current_ac_state.power == AC_POWER_ON)
-                        {
-                            hasCommand = true;
-                            cmd.health = AC_HEALTH_ON;
-                            cmd.fanTurbo = AC_FANTURBO_OFF;
+                            cmd.fanTurbo = AC_FANTURBO_ON;
                             cmd.fanMute = AC_FANMUTE_OFF;
-                            cmd.sleep = AC_SLEEP_OFF;
-
-                            if (cmd.mode == AC_MODE_COOL ||
-                                cmd.mode == AC_MODE_HEAT ||
-                                cmd.mode == AC_MODE_AUTO ||
-                                _current_ac_state.mode == AC_MODE_COOL ||
-                                _current_ac_state.mode == AC_MODE_HEAT ||
-                                _current_ac_state.mode == AC_MODE_AUTO)
-                            {
-                                cmd.fanSpeed = AC_FANSPEED_AUTO; // зависимость от health
+                            this->set_custom_fan_mode_(req_custom);
                             }
-                            else if (cmd.mode == AC_MODE_FAN ||
-                                     _current_ac_state.mode == AC_MODE_FAN)
+                            else if (strcmp(req_custom, Constants::MUTE.c_str()) == 0)
                             {
-                                cmd.fanSpeed = AC_FANSPEED_MEDIUM; // зависимость от health
-                            }
-                            this->set_custom_preset_(custom_preset);
-                        }
-                        else
-                        {
-                            _debugMsg(F("HEALTH preset is suitable in POWER_ON mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
-                        }
-                    }
-                    else if (strcmp(custom_preset, Constants::ANTIFUNGUS.c_str()) == 0)
-                    {
-                        // включение-выключение функции "Антиплесень".
-                        // По факту: после выключения сплита он оставляет минут на 5 открытые жалюзи и глушит вентилятор.
-                        // Уличный блок при этом гудит и тарахтит. Возможно, прогревается теплообменник для высыхания.
-                        // Через некоторое время внешний блок замолкает и сплит закрывает жалюзи.
-
-                        // Brokly:
-                        // включение-выключение функции "Антиплесень".
-                        // у меня пульт отправляет 5 посылок и на включение и на выключение, но реагирует на эту кнопку
-                        // только в режиме POWER_OFF
-
-                        // TODO: надо уточнить, в каких режимах штатно включается этот режим у кондиционера
-                        cmd.mildew = AC_MILDEW_ON;
-                        cmd.clean = AC_CLEAN_OFF; // для логики пресетов
-
-                        hasCommand = true;
-                        this->set_custom_preset_(custom_preset);
-                    }
-                }
-#else
-                else if (call.get_custom_preset().has_value())
-                {
-                    std::string custom_preset = *call.get_custom_preset();
-
-                    if (custom_preset == Constants::CLEAN)
-                    {
-                        // режим очистки кондиционера, включается (или должен включаться) при AC_POWER_OFF
-                        // TODO: надо отдебажить выключение этого режима
-                        if (cmd.power == AC_POWER_OFF or _current_ac_state.power == AC_POWER_OFF)
-                        {
                             hasCommand = true;
-                            cmd.clean = AC_CLEAN_ON;
-                            cmd.mildew = AC_MILDEW_OFF; // для логики пресетов
-                            this->custom_preset = custom_preset;
+                            cmd.fanMute = AC_FANMUTE_ON;
+                            cmd.fanTurbo = AC_FANTURBO_OFF;
+                            this->set_custom_fan_mode_(req_custom);
+                            }
                         }
-                        else
+                        #else
+                        else if (call.get_custom_fan_mode().has_value())
                         {
-                            _debugMsg(F("CLEAN preset is suitable in POWER_OFF mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
-                        }
-                    }
-                    else if (custom_preset == Constants::HEALTH)
-                    {
-                        if (cmd.power == AC_POWER_ON ||
-                            _current_ac_state.power == AC_POWER_ON)
-                        {
+                            std::string req_custom = *call.get_custom_fan_mode();
+
+                            // custom_fan_mode is a std::string in this branch
+                            if (this->custom_fan_mode == req_custom)
+                            {
+                            _debugMsg(F("Custom fan mode unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else if (req_custom == Constants::TURBO)
+                            {
                             hasCommand = true;
-                            cmd.health = AC_HEALTH_ON;
-                            // cmd.health_status = AC_HEALTH_STATUS_ON;  // GK: статус кондей сам поднимает
-                            cmd.fanTurbo = AC_FANTURBO_OFF; // зависимость от health
-                            cmd.fanMute = AC_FANMUTE_OFF;   // зависимость от health
-                            cmd.sleep = AC_SLEEP_OFF;       // для логики пресетов
-
-                            if (cmd.mode == AC_MODE_COOL ||
-                                cmd.mode == AC_MODE_HEAT ||
-                                cmd.mode == AC_MODE_AUTO ||
-                                _current_ac_state.mode == AC_MODE_COOL ||
-                                _current_ac_state.mode == AC_MODE_HEAT ||
-                                _current_ac_state.mode == AC_MODE_AUTO)
-                            {
-                                cmd.fanSpeed = AC_FANSPEED_AUTO; // зависимость от health
+                            cmd.fanTurbo = AC_FANTURBO_ON;
+                            cmd.fanMute = AC_FANMUTE_OFF;
+                            this->custom_fan_mode = req_custom;
                             }
-                            else if (cmd.mode == AC_MODE_FAN ||
-                                     _current_ac_state.mode == AC_MODE_FAN)
+                            else if (req_custom == Constants::MUTE)
                             {
-                                cmd.fanSpeed = AC_FANSPEED_MEDIUM; // зависимость от health
+                            hasCommand = true;
+                            cmd.fanMute = AC_FANMUTE_ON;
+                            cmd.fanTurbo = AC_FANTURBO_OFF;
+                            this->custom_fan_mode = req_custom;
                             }
-                            this->custom_preset = custom_preset;
                         }
-                        else
+                        #endif
+
+                        // -------------------------
+                        // PRESET (builtin)
+                        // -------------------------
+                        if (call.get_preset().has_value())
                         {
-                            _debugMsg(F("HEALTH preset is suitable in POWER_ON mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
+                            ClimatePreset req_preset = *call.get_preset();
+
+                            if (req_preset == this->preset)
+                            {
+                            _debugMsg(F("Preset unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else
+                            {
+                            switch (req_preset)
+                            {
+                            case climate::CLIMATE_PRESET_SLEEP:
+                                if (cmd.mode == AC_MODE_COOL || _current_ac_state.mode == AC_MODE_COOL ||
+                                    cmd.mode == AC_MODE_HEAT || _current_ac_state.mode == AC_MODE_HEAT ||
+                                    cmd.mode == AC_MODE_DRY  || _current_ac_state.mode == AC_MODE_DRY  ||
+                                    cmd.mode == AC_MODE_AUTO || _current_ac_state.mode == AC_MODE_AUTO)
+                                {
+                                hasCommand = true;
+                                cmd.sleep = AC_SLEEP_ON;
+                                cmd.health = AC_HEALTH_OFF;
+                                cmd.health_status = AC_HEALTH_STATUS_OFF;
+                                this->preset = req_preset;
+                                }
+                                else
+                                {
+                                _debugMsg(F("SLEEP preset is suitable in COOL and HEAT modes only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
+                                }
+                                break;
+
+                            case climate::CLIMATE_PRESET_NONE:
+                                hasCommand = true;
+                                cmd.health = AC_HEALTH_OFF;
+                                cmd.sleep = AC_SLEEP_OFF;
+                                cmd.mildew = AC_MILDEW_OFF;
+                                cmd.clean = AC_CLEAN_OFF;
+                                this->preset = req_preset;
+                                _debugMsg(F("Clear all builtin presets."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                                break;
+
+                            default:
+                                _debugMsg(F("Preset is unsupported."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                                break;
+                            }
+                            }
                         }
-                    }
-                    else if (custom_preset == Constants::ANTIFUNGUS)
-                    {
-                        // включение-выключение функции "Антиплесень".
-                        // По факту: после выключения сплита он оставляет минут на 5 открытые жалюзи и глушит вентилятор.
-                        // Уличный блок при этом гудит и тарахтит. Возможно, прогревается теплообменник для высыхания.
-                        // Через некоторое время внешний блок замолкает и сплит закрывает жалюзи.
+                        // -------------------------
+                        // PRESET (custom)
+                        // -------------------------
+                        #if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 11, 0)
+                        else if (call.has_custom_preset())
+                        {
+                            const char *req_custom = call.get_custom_preset();
 
-                        // Brokly:
-                        // включение-выключение функции "Антиплесень".
-                        // у меня пульт отправляет 5 посылок и на включение и на выключение, но реагирует на эту кнопку
-                        // только в режиме POWER_OFF
+                            if (this->has_custom_preset() && strcmp(this->get_custom_preset(), req_custom) == 0)
+                            {
+                            _debugMsg(F("Custom preset unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else if (strcmp(req_custom, Constants::CLEAN.c_str()) == 0)
+                            {
+                            if (cmd.power == AC_POWER_OFF || _current_ac_state.power == AC_POWER_OFF)
+                            {
+                                hasCommand = true;
+                                cmd.clean = AC_CLEAN_ON;
+                                cmd.mildew = AC_MILDEW_OFF;
+                                this->set_custom_preset_(req_custom);
+                            }
+                            else
+                            {
+                                _debugMsg(F("CLEAN preset is suitable in POWER_OFF mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
+                            }
+                            }
+                            else if (strcmp(req_custom, Constants::HEALTH.c_str()) == 0)
+                            {
+                            if (cmd.power == AC_POWER_ON || _current_ac_state.power == AC_POWER_ON)
+                            {
+                                hasCommand = true;
+                                cmd.health = AC_HEALTH_ON;
+                                cmd.fanTurbo = AC_FANTURBO_OFF;
+                                cmd.fanMute = AC_FANMUTE_OFF;
+                                cmd.sleep = AC_SLEEP_OFF;
 
-                        // TODO: надо уточнить, в каких режимах штатно включается этот режим у кондиционера
-                        cmd.mildew = AC_MILDEW_ON;
-                        cmd.clean = AC_CLEAN_OFF; // для логики пресетов
+                                if (cmd.mode == AC_MODE_COOL || cmd.mode == AC_MODE_HEAT || cmd.mode == AC_MODE_AUTO ||
+                                    _current_ac_state.mode == AC_MODE_COOL || _current_ac_state.mode == AC_MODE_HEAT || _current_ac_state.mode == AC_MODE_AUTO)
+                                {
+                                cmd.fanSpeed = AC_FANSPEED_AUTO;
+                                }
+                                else if (cmd.mode == AC_MODE_FAN || _current_ac_state.mode == AC_MODE_FAN)
+                                {
+                                cmd.fanSpeed = AC_FANSPEED_MEDIUM;
+                                }
 
-                        hasCommand = true;
-                        this->custom_preset = custom_preset;
-                    }
-                }
-#endif
-
-                // User requested swing_mode change
-                if (call.get_swing_mode().has_value())
-                {
-                    ClimateSwingMode swingmode = *call.get_swing_mode();
-
-                    switch (swingmode)
-                    {
-                    // The protocol allows other combinations for SWING.
-                    // For example "turn the louvers to the desired position or "spread to the sides" / "concentrate in the center".
-                    // But the ROVEX IR-remote does not provide this features. Therefore this features haven't been tested.
-                    // May be suitable for other models of AUX-based ACs.
-                    case climate::CLIMATE_SWING_OFF:
-                        // Stop BOTH axes, but don't disturb vertical if it was already fixed (2..6)
-                        cmd.louver.louver_h = AC_LOUVERH_OFF_ALTERNATIVE;
-                        if (_current_ac_state.louver.louver_v == AC_LOUVERV_SWING_UPDOWN) {
-                            // If vertical was swinging, stop it.
-                            cmd.louver.louver_v = AC_LOUVERV_OFF;
-                        } else {
-                            // Keep existing fixed position (2..6).
-                            cmd.louver.louver_v = _current_ac_state.louver.louver_v;
+                                this->set_custom_preset_(req_custom);
+                            }
+                            else
+                            {
+                                _debugMsg(F("HEALTH preset is suitable in POWER_ON mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
+                            }
+                            }
+                            else if (strcmp(req_custom, Constants::ANTIFUNGUS.c_str()) == 0)
+                            {
+                            hasCommand = true;
+                            cmd.mildew = AC_MILDEW_ON;
+                            cmd.clean = AC_CLEAN_OFF;
+                            this->set_custom_preset_(req_custom);
+                            }
                         }
+                        #else
+                        else if (call.get_custom_preset().has_value())
+                        {
+                            std::string req_custom = *call.get_custom_preset();
 
-                        hasCommand = true;
-                        this->swing_mode = swingmode;
-                        break;
+                            if (this->custom_preset == req_custom)
+                            {
+                            _debugMsg(F("Custom preset unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else if (req_custom == Constants::CLEAN)
+                            {
+                            if (cmd.power == AC_POWER_OFF || _current_ac_state.power == AC_POWER_OFF)
+                            {
+                                hasCommand = true;
+                                cmd.clean = AC_CLEAN_ON;
+                                cmd.mildew = AC_MILDEW_OFF;
+                                this->custom_preset = req_custom;
+                            }
+                            else
+                            {
+                                _debugMsg(F("CLEAN preset is suitable in POWER_OFF mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
+                            }
+                            }
+                            else if (req_custom == Constants::HEALTH)
+                            {
+                            if (cmd.power == AC_POWER_ON || _current_ac_state.power == AC_POWER_ON)
+                            {
+                                hasCommand = true;
+                                cmd.health = AC_HEALTH_ON;
+                                cmd.fanTurbo = AC_FANTURBO_OFF;
+                                cmd.fanMute = AC_FANMUTE_OFF;
+                                cmd.sleep = AC_SLEEP_OFF;
 
-                    case climate::CLIMATE_SWING_BOTH:
-                        cmd.louver.louver_h = AC_LOUVERH_SWING_LEFTRIGHT;
-                        cmd.louver.louver_v = AC_LOUVERV_SWING_UPDOWN;
-                        hasCommand = true;
-                        this->swing_mode = swingmode;
-                        break;
+                                if (cmd.mode == AC_MODE_COOL || cmd.mode == AC_MODE_HEAT || cmd.mode == AC_MODE_AUTO ||
+                                    _current_ac_state.mode == AC_MODE_COOL || _current_ac_state.mode == AC_MODE_HEAT || _current_ac_state.mode == AC_MODE_AUTO)
+                                {
+                                cmd.fanSpeed = AC_FANSPEED_AUTO;
+                                }
+                                else if (cmd.mode == AC_MODE_FAN || _current_ac_state.mode == AC_MODE_FAN)
+                                {
+                                cmd.fanSpeed = AC_FANSPEED_MEDIUM;
+                                }
 
-                    case climate::CLIMATE_SWING_VERTICAL:
-                        cmd.louver.louver_h = AC_LOUVERH_OFF_ALTERNATIVE;
-                        cmd.louver.louver_v = AC_LOUVERV_SWING_UPDOWN;
-                        hasCommand = true;
-                        this->swing_mode = swingmode;
-                        break;
+                                this->custom_preset = req_custom;
+                            }
+                            else
+                            {
+                                _debugMsg(F("HEALTH preset is suitable in POWER_ON mode only."), ESPHOME_LOG_LEVEL_WARN, __LINE__);
+                            }
+                            }
+                            else if (req_custom == Constants::ANTIFUNGUS)
+                            {
+                            hasCommand = true;
+                            cmd.mildew = AC_MILDEW_ON;
+                            cmd.clean = AC_CLEAN_OFF;
+                            this->custom_preset = req_custom;
+                            }
+                        }
+                        #endif
 
-                    case climate::CLIMATE_SWING_HORIZONTAL:
-                        cmd.louver.louver_h = AC_LOUVERH_SWING_LEFTRIGHT;
-                        // Stop vertical only if it was swinging; otherwise preserve prior fixed position
-                        if (_current_ac_state.louver.louver_v == AC_LOUVERV_SWING_UPDOWN) {
+                        // -------------------------
+                        // SWING
+                        // -------------------------
+                        if (call.get_swing_mode().has_value())
+                        {
+                            ClimateSwingMode req_swing = *call.get_swing_mode();
+
+                            if (req_swing == this->swing_mode)
+                            {
+                            _debugMsg(F("Swing mode unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else
+                            {
+                            switch (req_swing)
+                            {
+                            case climate::CLIMATE_SWING_OFF:
+                                cmd.louver.louver_h = AC_LOUVERH_OFF_ALTERNATIVE;
+                                if (_current_ac_state.louver.louver_v == AC_LOUVERV_SWING_UPDOWN)
                                 cmd.louver.louver_v = AC_LOUVERV_OFF;
-                            } else {
+                                else
                                 cmd.louver.louver_v = _current_ac_state.louver.louver_v;
+                                hasCommand = true;
+                                this->swing_mode = req_swing;
+                                break;
+
+                            case climate::CLIMATE_SWING_BOTH:
+                                cmd.louver.louver_h = AC_LOUVERH_SWING_LEFTRIGHT;
+                                cmd.louver.louver_v = AC_LOUVERV_SWING_UPDOWN;
+                                hasCommand = true;
+                                this->swing_mode = req_swing;
+                                break;
+
+                            case climate::CLIMATE_SWING_VERTICAL:
+                                cmd.louver.louver_h = AC_LOUVERH_OFF_ALTERNATIVE;
+                                cmd.louver.louver_v = AC_LOUVERV_SWING_UPDOWN;
+                                hasCommand = true;
+                                this->swing_mode = req_swing;
+                                break;
+
+                            case climate::CLIMATE_SWING_HORIZONTAL:
+                                cmd.louver.louver_h = AC_LOUVERH_SWING_LEFTRIGHT;
+                                if (_current_ac_state.louver.louver_v == AC_LOUVERV_SWING_UPDOWN)
+                                cmd.louver.louver_v = AC_LOUVERV_OFF;
+                                else
+                                cmd.louver.louver_v = _current_ac_state.louver.louver_v;
+                                hasCommand = true;
+                                this->swing_mode = req_swing;
+                                break;
+
+                            default:
+                                break;
                             }
-                        hasCommand = true;
-                        this->swing_mode = swingmode;
-                        break;
-                    }
-                }
+                            }
+                        }
 
-                // User requested target temperature change
-                if (call.get_target_temperature().has_value())
-                {
-                    // выставлять температуру в режиме FAN не нужно
-                    if (cmd.mode != AC_MODE_FAN && _current_ac_state.mode != AC_MODE_FAN)
-                    {
-                        hasCommand = true;
-                        cmd.temp_target = _temp_target_normalise(*call.get_target_temperature()); // Send target temp to climate
-                        cmd.temp_target_matter = true;
-                    }
-                }
+                        // -------------------------
+                        // TARGET TEMPERATURE
+                        // -------------------------
+                        if (call.get_target_temperature().has_value())
+                        {
+                            // Don't set temp in FAN mode
+                            if (cmd.mode != AC_MODE_FAN && _current_ac_state.mode != AC_MODE_FAN)
+                            {
+                            const float req_norm = _temp_target_normalise(*call.get_target_temperature());
+                            const float cur_norm = _temp_target_normalise(this->target_temperature);
 
-                if (hasCommand)
-                {
-                    commandSequence(&cmd);
-                    if (this->get_optimistic())
-                    {
-                        this->publish_all_states(); // Publish updated state
-                    }
+                            // Protocol step is 0.5°C, so <0.25 means "same step"
+                            if (fabsf(req_norm - cur_norm) < 0.25f)
+                            {
+                                _debugMsg(F("Target temperature unchanged, skipping."), ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                            }
+                            else
+                            {
+                                hasCommand = true;
+                                cmd.temp_target = req_norm;
+                                cmd.temp_target_matter = true;
+                            }
+                            }
+                        }
 
-#if defined(PRESETS_SAVING)
-                    // флаг отправки новой команды, для процедуры сохранения пресетов, если есть настройка
-                    _new_command_set = _store_settings;
-#endif
-                }
-            }
+                        // -------------------------
+                        // SEND
+                        // -------------------------
+                        if (hasCommand)
+                        {
+                            commandSequence(&cmd);
+                            if (this->get_optimistic())
+                            this->publish_all_states();
+
+                        #if defined(PRESETS_SAVING)
+                            _new_command_set = _store_settings;
+                        #endif
+                        }
+                        }
+
 
             // как оказалось сюда обращаются каждый раз для получения любого параметра
             // по этому имеет смысл держать готовый объект
