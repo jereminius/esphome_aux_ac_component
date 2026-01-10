@@ -6,8 +6,7 @@
 
 #include <stdarg.h>
 #include <cinttypes>
-#include <math.h
->
+#include <math.h>
 #include "esphome.h"
 #include "esphome/components/binary_sensor/binary_sensor.h"
 #include "esphome/components/climate/climate.h"
