@@ -4,6 +4,14 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 
+#if ESPHOME_VERSION_CODE >= VERSION_CODE(2025, 11, 0)
+// ESPHome 2025.11+ expects play(const Ts&...)
+#define AUXAC_PLAY_SIG AUXAC_PLAY_SIG
+#else
+// ESPHome <= 2025.10 expects play(Ts...)
+#define AUXAC_PLAY_SIG AUXAC_PLAY_SIG
+#endif
+
 namespace esphome
 {
     namespace aux_ac
@@ -16,7 +24,7 @@ namespace esphome
         public:
             explicit AirConDisplayOffAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->displayOffSequence();
             }
@@ -31,7 +39,7 @@ namespace esphome
         public:
             explicit AirConDisplayOnAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->displayOnSequence();
             }
@@ -47,7 +55,7 @@ namespace esphome
         public:
             explicit AirConVLouverSwingAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->setVLouverSwingSequence();
             }
@@ -62,7 +70,7 @@ namespace esphome
         public:
             explicit AirConVLouverStopAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->setVLouverStopSequence();
             }
@@ -77,7 +85,7 @@ namespace esphome
         public:
             explicit AirConVLouverTopAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->setVLouverTopSequence();
             }
@@ -92,7 +100,7 @@ namespace esphome
         public:
             explicit AirConVLouverMiddleAboveAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->setVLouverMiddleAboveSequence();
             }
@@ -107,7 +115,7 @@ namespace esphome
         public:
             explicit AirConVLouverMiddleAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->setVLouverMiddleSequence();
             }
@@ -122,7 +130,7 @@ namespace esphome
         public:
             explicit AirConVLouverMiddleBelowAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->setVLouverMiddleBelowSequence();
             }
@@ -137,7 +145,7 @@ namespace esphome
         public:
             explicit AirConVLouverBottomAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->setVLouverBottomSequence();
             }
@@ -154,7 +162,7 @@ namespace esphome
 
             AirConVLouverSetAction(AirCon *ac) : ac_(ac) {};
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 vlpos_ = this->value_.value(x...);
                 this->ac_->setVLouverFrontendSequence((ac_vlouver_frontend)vlpos_);
@@ -182,7 +190,7 @@ namespace esphome
                 this->static_ = true;
             }
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 if (this->static_)
                 {
@@ -209,7 +217,7 @@ namespace esphome
         public:
             explicit AirConPowerLimitationOffAction(AirCon *ac) : ac_(ac) {}
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->ac_->powerLimitationOffSequence();
             }
@@ -226,7 +234,7 @@ namespace esphome
 
             AirConPowerLimitationOnAction(AirCon *ac) : ac_(ac) {};
 
-            void play(Ts... x) override
+            AUXAC_PLAY_SIG
             {
                 this->pwr_lim_ = this->value_.value(x...);
                 this->ac_->powerLimitationOnSequence(this->pwr_lim_);
@@ -239,3 +247,4 @@ namespace esphome
 
     } // namespace aux_ac
 } // namespace esphome
+#undef AUXAC_PLAY_SIG
