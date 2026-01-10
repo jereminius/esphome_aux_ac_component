@@ -3386,49 +3386,37 @@ namespace esphome
                             }
                         }
 
-                   // -------------------------
+                    // -------------------------
                     // TARGET TEMPERATURE
                     // -------------------------
                     if (call.get_target_temperature().has_value())
                     {
-                    // Don't set temp in FAN mode
-                    if (cmd.mode != AC_MODE_FAN && _current_ac_state.mode != AC_MODE_FAN)
+                    // Do not send temp changes while AC is OFF (prevents beep spam)
+                    if (_current_ac_state.power == AC_POWER_OFF)
+                    {
+                        _debugMsg(F("AC is OFF, skipping target temperature command."),
+                                ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
+                    }
+                    else if (cmd.mode != AC_MODE_FAN && _current_ac_state.mode != AC_MODE_FAN)
                     {
                         const float req_norm = _temp_target_normalise(*call.get_target_temperature());
                     
-                        // Prefer comparing against AC state (most reliable)
-                        if (_current_ac_state.temp_target_matter)
+                        // Compare to last known AC target temp if available
+                        if (_current_ac_state.temp_target_matter &&
+                            fabsf(req_norm - _current_ac_state.temp_target) < 0.05f)
                         {
-                        if (fabsf(req_norm - _current_ac_state.temp_target) < 0.05f)
-                        {
-                            _debugMsg(F("Target temperature unchanged (AC state), skipping."),
+                        _debugMsg(F("Target temperature unchanged, skipping."),
                                     ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
                         }
                         else
                         {
-                            hasCommand = true;
-                            cmd.temp_target = req_norm;
-                            cmd.temp_target_matter = true;
-                        }
-                        }
-                        else
-                        {
-                        // Fallback if we don't have AC state yet
-                        const float cur_norm = _temp_target_normalise(this->target_temperature);
-                        if (fabsf(req_norm - cur_norm) < 0.05f)
-                        {
-                            _debugMsg(F("Target temperature unchanged (frontend), skipping."),
-                                    ESPHOME_LOG_LEVEL_VERBOSE, __LINE__);
-                        }
-                        else
-                        {
-                            hasCommand = true;
-                            cmd.temp_target = req_norm;
-                            cmd.temp_target_matter = true;
-                        }
+                        hasCommand = true;
+                        cmd.temp_target = req_norm;
+                        cmd.temp_target_matter = true;
                         }
                     }
                     }
+                    
                     
                         // -------------------------
                         // SEND
